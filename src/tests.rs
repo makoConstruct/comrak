@@ -7,10 +7,7 @@ use propfuzz::prelude::*;
 use {parse_document, Arena, ComrakOptions, ComrakExtensionOptions, ComrakParseOptions, ComrakRenderOptions};
 
 #[propfuzz]
-fn fuzz_doesnt_crash(
-    #[propfuzz()]
-    md: String,
-) {
+fn fuzz_doesnt_crash(md: String) {
     let options = ComrakOptions{
         extension: ComrakExtensionOptions{
             strikethrough: true,
