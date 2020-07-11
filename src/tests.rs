@@ -3,7 +3,40 @@ use html;
 #[cfg(feature = "benchmarks")]
 use test::Bencher;
 use timebomb::timeout_ms;
-use {parse_document, Arena, ComrakOptions};
+use propfuzz::prelude::*;
+use {parse_document, Arena, ComrakOptions, ComrakExtensionOptions, ComrakParseOptions, ComrakRenderOptions};
+
+#[propfuzz]
+fn fuzz_doesnt_crash(
+    #[propfuzz()]
+    md: String,
+) {
+    let options = ComrakOptions{
+        extension: ComrakExtensionOptions{
+            strikethrough: true,
+            tagfilter: true,
+            table: true,
+            autolink: true,
+            tasklist: true,
+            superscript: true,
+            header_ids: Some("user-content-".to_string()),
+            footnotes: true,
+            description_lists: true,
+        },
+        parse: ComrakParseOptions{
+            smart: true,
+            default_info_string: Some("Rust".to_string()),
+        },
+        render: ComrakRenderOptions{
+            hardbreaks: true,
+            github_pre_lang: true,
+            width: 80,
+            unsafe_: true,
+        },
+    };
+
+    parse_document(&Arena::new(), &md, &options);
+}
 
 fn compare_strs(output: &str, expected: &str, kind: &str) {
     if output != expected {

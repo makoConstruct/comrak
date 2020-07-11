@@ -33,6 +33,7 @@ pest_derive = "2"
 
 [dev-dependencies]
 timebomb = "0.1.2"
+propfuzz = "0.0.1"
 
 [features]
 default = ["clap"]

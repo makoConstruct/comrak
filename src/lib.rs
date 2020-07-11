@@ -87,6 +87,8 @@ extern crate timebomb;
 extern crate twoway;
 extern crate typed_arena;
 extern crate unicode_categories;
+#[cfg(test)]
+extern crate propfuzz;
 
 pub mod arena_tree;
 mod cm;
