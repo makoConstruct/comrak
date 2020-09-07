@@ -266,6 +266,19 @@ pub struct ComrakExtensionOptions {
     ///            "<dl><dt>Term</dt>\n<dd>\n<p>Definition</p>\n</dd>\n</dl>\n");
     /// ```
     pub description_lists: bool,
+    
+    /// Enables generating a table of contents from headings
+    ///
+    /// Creates anchors, like header_ids. Uses the prefix specified by header_ids if present.
+    ///
+    /// ```
+    /// # use comrak::{markdown_to_html, ComrakOptions};
+    /// let mut options = ComrakOptions::default();
+    /// options.extension.table_of_contents = Some("custom-prefix-".to_string());
+    /// assert_eq!(markdown_to_html("# README\n", &options),
+    ///            "<div class=\"custom-prefix-toc\">\n<ul>\n<li><a href=\"#readme\">README</a></li>\n</ul>\n</div>\n");
+    /// ```
+    pub table_of_contents: Option<String>,
 }
 
 #[derive(Default, Debug, Clone)]

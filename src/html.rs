@@ -15,17 +15,49 @@ pub fn format_document<'a>(
     options: &ComrakOptions,
     output: &mut dyn Write,
 ) -> io::Result<()> {
+    
+    let mut body_part:Vec<u8> = Vec::new();
     let mut writer = WriteWithLast {
-        output,
+        output: &mut body_part,
         last_was_lf: Cell::new(true),
     };
+    
     let mut f = HtmlFormatter::new(options, &mut writer);
+    
     f.format(root, false)?;
     if f.footnote_ix > 0 {
         f.output.write_all(b"</ol>\n</section>\n")?;
     }
+    
+    if let Some(ref tp) = options.extension.table_of_contents {
+        write!(output, "<div class=\"{}TOC\"><ul>\n", tp)?;
+        let mut eye = 0;
+        write_table(&f.table_stack, &mut eye, output)?;
+        write!(output, "</ul></div>\n")?;
+    }
+    
+    output.write_all(&body_part);
+    
     Ok(())
 }
+
+
+fn write_table(table: &[TOCSectionEntry], eye:&mut usize, output:&mut dyn Write)-> io::Result<()> {
+    if *eye >= table.len() { return Ok(()) }
+    let ts = &table[*eye];
+    write!(output, "<li><a href=\"#{}\">{}</a></li>\n", &ts.id, &ts.title)?;
+    *eye += 1;
+    if *eye < table.len() && table[*eye].depth > ts.depth {
+        write!(output, "<ul>\n")?;
+        loop {
+            write_table(table, eye, output);
+            if *eye >= table.len() || table[*eye].depth <= ts.depth { break }
+        }
+        write!(output, "</ul>\n")?;
+    }
+    Ok(())
+}
+
 
 pub struct WriteWithLast<'w> {
     output: &'w mut dyn Write,
@@ -116,8 +148,28 @@ impl Anchorizer {
     }
 }
 
+struct TOCSectionEntry {
+    id: String,
+    title: String,
+    depth: u32,
+}
+
+// fn table_to_insert_to(level: &mut TOCSectionEntry, insertee_level: u32)-> &mut TOCSectionEntry{
+//     {
+//         let se = &mut level.sub_entries;
+//         match se.last_mut() {
+//             Some(next) if next.depth < insertee_level => {
+//                 return table_to_insert_to(next, insertee_level);
+//             }
+//             _=> {}
+//         }
+//     }
+//     level
+// }
+
 struct HtmlFormatter<'o> {
     output: &'o mut WriteWithLast<'o>,
+    table_stack: Vec<TOCSectionEntry>,
     options: &'o ComrakOptions,
     anchorizer: Anchorizer,
     footnote_ix: u32,
@@ -233,11 +285,28 @@ fn dangerous_url(input: &[u8]) -> bool {
     scanners::dangerous_url(input).is_some()
 }
 
+// fn print_table_stack(v: &TOCSectionEntry, indent: usize){
+//     for _ in 0..indent {
+//         print!("  ");
+//     }
+//     println!("{}, {}", &v.id, &v.title);
+//     for sv in v.sub_entries.iter() {
+//         print_table_stack(sv, indent + 1);
+//     }
+// }
+
 impl<'o> HtmlFormatter<'o> {
     fn new(options: &'o ComrakOptions, output: &'o mut WriteWithLast<'o>) -> Self {
         HtmlFormatter {
             options,
             output,
+            table_stack: Vec::new(),
+            // table_stack: TOCSectionEntry{
+            //     id: "".into(),
+            //     title: "".into(),
+            //     sub_entries: Vec::new(),
+            //     depth: 1,
+            // },
             anchorizer: Anchorizer::new(),
             footnote_ix: 0,
             written_footnote_ix: 0,
@@ -363,7 +432,7 @@ impl<'o> HtmlFormatter<'o> {
                 }
             }
         }
-
+        
         Ok(())
     }
 
@@ -445,19 +514,36 @@ impl<'o> HtmlFormatter<'o> {
                     self.cr()?;
                     write!(self.output, "<h{}>", nch.level)?;
 
-                    if let Some(ref prefix) = self.options.extension.header_ids {
+                    if
+                        self.options.extension.header_ids.is_some() ||
+                        self.options.extension.table_of_contents.is_some()
+                    {
+                        let prefix = if let Some(ref p) = self.options.extension.header_ids {
+                            p
+                        }else{
+                            ""
+                        };
                         let mut text_content = Vec::with_capacity(20);
                         self.collect_text(node, &mut text_content);
-
-                        let mut id = String::from_utf8(text_content).unwrap();
-                        id = self.anchorizer.anchorize(id);
+                        let title = String::from_utf8(text_content).unwrap();
+                        let id = self.anchorizer.anchorize(title.clone());
                         write!(
                             self.output,
                             "<a href=\"#{}\" aria-hidden=\"true\" class=\"anchor\" id=\"{}{}\"></a>",
-                            id,
+                            &id,
                             prefix,
-                            id
+                            &id
                         )?;
+                        
+                        if self.options.extension.table_of_contents.is_some() {
+                            self.table_stack.push(
+                                TOCSectionEntry{
+                                    id,
+                                    title,
+                                    depth: nch.level,
+                                }
+                            );
+                        }
                     }
                 } else {
                     writeln!(self.output, "</h{}>", nch.level)?;
